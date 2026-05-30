@@ -69,13 +69,14 @@ function SortableChip({ id, item, onRemove }) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border
+      className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border
         select-none touch-none
         ${isCustom
           ? 'bg-amber-50 text-amber-700 border-amber-200'
           : 'bg-indigo-50 text-indigo-700 border-indigo-200'}
         ${isDragging ? 'shadow-lg' : 'cursor-grab active:cursor-grabbing'}`}
     >
+      <span className={`text-xs leading-none opacity-40 ${isCustom ? 'text-amber-500' : 'text-indigo-400'}`}>⠿</span>
       {item.value}
       <button
         onPointerDown={(e) => e.stopPropagation()}
@@ -204,11 +205,14 @@ function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCus
         <div className="flex items-center gap-1.5">
           <button
             {...dragHandleListeners}
-            className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing
-                       touch-none px-0.5 text-base leading-none select-none"
+            className="flex items-center gap-0.5 px-1.5 py-1 rounded
+                       bg-gray-100 hover:bg-indigo-100 text-gray-400 hover:text-indigo-500
+                       cursor-grab active:cursor-grabbing touch-none select-none
+                       border border-gray-200 hover:border-indigo-300 transition-colors"
             aria-label="블럭 순서 변경"
+            title="드래그해서 순서 변경"
           >
-            ≡
+            <span className="text-xs leading-none tracking-tighter font-bold">⠿</span>
           </button>
           <span className="text-xs font-semibold text-gray-700">{category.category}</span>
         </div>
@@ -293,7 +297,7 @@ function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
     <aside className="w-72 min-w-60 bg-gray-50 border-l border-gray-200 overflow-y-auto flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-sm font-bold text-gray-800">선택된 조합</h2>
-        <p className="text-xs text-gray-400 mt-0.5">≡ 드래그로 순서를 바꿀 수 있습니다</p>
+        <p className="text-xs text-gray-400 mt-0.5">블럭: ⠿ 버튼 드래그 · 칩: 칩 자체 드래그</p>
       </div>
 
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
