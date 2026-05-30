@@ -5,6 +5,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  pointerWithin,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -268,6 +269,19 @@ function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
 
+  // 칩은 칩끼리, 블럭은 블럭끼리만 충돌 감지
+  function collisionDetection(args) {
+    const activeId = String(args.active.id)
+    const isChip = activeId.startsWith('chip-')
+    const filtered = {
+      ...args,
+      droppableContainers: args.droppableContainers.filter((c) =>
+        isChip ? String(c.id).startsWith('chip-') : !String(c.id).startsWith('chip-')
+      ),
+    }
+    return closestCenter(filtered)
+  }
+
   function handleDragEnd({ active, over }) {
     if (!over || active.id === over.id) return
 
@@ -276,7 +290,6 @@ function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
     const isChip = activeId.startsWith('chip-')
 
     if (isChip) {
-      // 칩 드래그: 같은 블럭 안에서만 재정렬
       for (const catId of blockOrder) {
         const chips = blocks[catId] || []
         const oldIdx = chips.findIndex((c) => c.id === activeId)
@@ -287,8 +300,6 @@ function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
         }
       }
     } else {
-      // 블럭 드래그: 블럭 순서 변경 (over가 칩이면 무시)
-      if (overId.startsWith('chip-')) return
       const oldIdx = blockOrder.indexOf(activeId)
       const newIdx = blockOrder.indexOf(overId)
       if (oldIdx !== -1 && newIdx !== -1) {
@@ -324,7 +335,7 @@ function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
         {/* DndContext 하나 — 블럭과 칩 모두 처리 */}
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={collisionDetection}
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={blockOrder} strategy={verticalListSortingStrategy}>
