@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react'
 import { blockCategories, parameterOptions } from './blockData.js'
 
-function buildPrompt(blocks, params) {
+function buildPrompt(prefix, blocks, params) {
   const parts = blockCategories
     .map((cat) => {
       const block = blocks[cat.id]
       return block && block.length > 0 ? block.join(', ') : null
     })
     .filter(Boolean)
+
+  if (prefix.trim()) parts.unshift(prefix.trim())
 
   const paramStr = params.length > 0 ? ' ' + params.join(' ') : ''
   return parts.length > 0 ? parts.join(', ') + paramStr : ''
@@ -138,7 +140,7 @@ function SelectedCategoryBlock({ category, selected, onRemove, onClear }) {
   )
 }
 
-function RightPanel({ blocks, params, onRemove, onClear, onToggleParam }) {
+function RightPanel({ prefix, onPrefixChange, blocks, params, onRemove, onClear, onToggleParam }) {
   const hasAny = blockCategories.some((c) => (blocks[c.id] || []).length > 0)
 
   return (
@@ -146,6 +148,22 @@ function RightPanel({ blocks, params, onRemove, onClear, onToggleParam }) {
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-sm font-bold text-gray-800">선택된 조합</h2>
         <p className="text-xs text-gray-400 mt-0.5">선택한 속성이 여기에 쌓입니다</p>
+      </div>
+
+      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+          고정 접두어
+        </label>
+        <input
+          type="text"
+          value={prefix}
+          onChange={(e) => onPrefixChange(e.target.value)}
+          placeholder="예: Korean, East Asian"
+          className="w-full text-xs px-2.5 py-1.5 rounded border border-gray-300
+                     text-gray-700 placeholder-gray-300 bg-gray-50
+                     focus:outline-none focus:border-indigo-400 focus:bg-white transition-colors"
+        />
+        <p className="text-xs text-gray-300 mt-1">프롬프트 맨 앞에 항상 붙습니다</p>
       </div>
 
       <div className="p-4 flex-1 flex flex-col gap-2">
@@ -200,6 +218,7 @@ function RightPanel({ blocks, params, onRemove, onClear, onToggleParam }) {
 }
 
 export default function App() {
+  const [prefix, setPrefix] = useState('Korean, East Asian')
   const [blocks, setBlocks] = useState({})
   const [params, setParams] = useState([])
 
@@ -227,7 +246,7 @@ export default function App() {
     )
   }
 
-  const prompt = useMemo(() => buildPrompt(blocks, params), [blocks, params])
+  const prompt = useMemo(() => buildPrompt(prefix, blocks, params), [prefix, blocks, params])
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 text-gray-900 overflow-hidden">
@@ -268,6 +287,8 @@ export default function App() {
         </main>
 
         <RightPanel
+          prefix={prefix}
+          onPrefixChange={setPrefix}
           blocks={blocks}
           params={params}
           onRemove={handleRemove}
