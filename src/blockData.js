@@ -2,7 +2,6 @@ export const blockCategories = [
   {
     id: 'subject',
     category: '피사체 (Subject)',
-    emoji: '🎯',
     description: '이미지의 주인공',
     attributes: [
       'a young woman',
@@ -22,7 +21,6 @@ export const blockCategories = [
   {
     id: 'style',
     category: '스타일 (Style)',
-    emoji: '🎨',
     description: '전체적인 예술 스타일',
     attributes: [
       'photorealistic',
@@ -42,7 +40,6 @@ export const blockCategories = [
   {
     id: 'lighting',
     category: '조명 (Lighting)',
-    emoji: '💡',
     description: '빛의 방향과 분위기',
     attributes: [
       'golden hour',
@@ -62,7 +59,6 @@ export const blockCategories = [
   {
     id: 'composition',
     category: '구도 (Composition)',
-    emoji: '📐',
     description: '카메라 앵글과 프레임',
     attributes: [
       'close-up portrait',
@@ -82,7 +78,6 @@ export const blockCategories = [
   {
     id: 'mood',
     category: '분위기 (Mood)',
-    emoji: '🌙',
     description: '감정과 톤',
     attributes: [
       'mysterious',
@@ -102,7 +97,6 @@ export const blockCategories = [
   {
     id: 'setting',
     category: '배경 (Setting)',
-    emoji: '🏔️',
     description: '장소와 환경',
     attributes: [
       'enchanted forest',
@@ -122,7 +116,6 @@ export const blockCategories = [
   {
     id: 'color',
     category: '색감 (Color Palette)',
-    emoji: '🌈',
     description: '전체 색상 톤',
     attributes: [
       'warm tones',
@@ -142,7 +135,6 @@ export const blockCategories = [
   {
     id: 'quality',
     category: '품질 (Quality)',
-    emoji: '⭐',
     description: '렌더링 품질 태그',
     attributes: [
       'ultra detailed',
