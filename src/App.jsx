@@ -5,7 +5,7 @@ function buildPrompt(prefix, blocks, params) {
   const parts = blockCategories
     .map((cat) => {
       const block = blocks[cat.id]
-      return block && block.length > 0 ? block.join(', ') : null
+      return block && block.length > 0 ? block.map((item) => item.value).join(', ') : null
     })
     .filter(Boolean)
 
@@ -53,15 +53,20 @@ function PromptPreview({ prompt }) {
   )
 }
 
-function Chip({ label, onRemove }) {
+function Chip({ item, onRemove }) {
+  const isCustom = item.type === 'custom'
   return (
-    <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full
-                     bg-indigo-50 text-indigo-700 border border-indigo-200">
-      {label}
+    <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border
+      ${isCustom
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}
+    >
+      {item.value}
       <button
         onClick={onRemove}
-        className="ml-0.5 text-indigo-400 hover:text-indigo-700 leading-none font-bold"
-        aria-label={`${label} 삭제`}
+        className={`ml-0.5 leading-none font-bold
+          ${isCustom ? 'text-amber-400 hover:text-amber-700' : 'text-indigo-400 hover:text-indigo-700'}`}
+        aria-label={`${item.value} 삭제`}
       >
         ×
       </button>
@@ -109,7 +114,20 @@ function LeftPanel({ onSelect }) {
   )
 }
 
-function SelectedCategoryBlock({ category, selected, onRemove, onClear }) {
+function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCustom }) {
+  const [input, setInput] = useState('')
+
+  function handleAdd() {
+    const trimmed = input.trim()
+    if (!trimmed) return
+    onAddCustom(category.id, trimmed)
+    setInput('')
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') handleAdd()
+  }
+
   return (
     <div className="bg-white rounded-lg p-3 border border-gray-200">
       <div className="flex items-center justify-between mb-2">
@@ -123,26 +141,49 @@ function SelectedCategoryBlock({ category, selected, onRemove, onClear }) {
           </button>
         )}
       </div>
-      {selected.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {selected.map((attr, idx) => (
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selected.map((item, idx) => (
             <Chip
-              key={`${attr}-${idx}`}
-              label={attr}
+              key={`${item.value}-${idx}`}
+              item={item}
               onRemove={() => onRemove(category.id, idx)}
             />
           ))}
         </div>
-      ) : (
-        <p className="text-xs text-gray-300 italic">선택된 속성 없음</p>
       )}
+
+      {selected.length === 0 && (
+        <p className="text-xs text-gray-300 italic mb-2">선택된 속성 없음</p>
+      )}
+
+      <div className="flex gap-1.5 mt-1">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="직접 입력..."
+          className="flex-1 text-xs px-2 py-1 rounded border border-gray-200 text-gray-700
+                     placeholder-gray-300 bg-gray-50
+                     focus:outline-none focus:border-amber-400 focus:bg-white transition-colors"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!input.trim()}
+          className="text-xs px-2 py-1 rounded border border-amber-300 text-amber-600
+                     bg-amber-50 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed
+                     transition-colors shrink-0"
+        >
+          추가
+        </button>
+      </div>
     </div>
   )
 }
 
-function RightPanel({ prefix, onPrefixChange, blocks, params, onRemove, onClear, onToggleParam }) {
-  const hasAny = blockCategories.some((c) => (blocks[c.id] || []).length > 0)
-
+function RightPanel({ prefix, onPrefixChange, blocks, params, onRemove, onClear, onToggleParam, onAddCustom }) {
   return (
     <aside className="w-72 min-w-60 bg-gray-50 border-l border-gray-200 overflow-y-auto flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -167,28 +208,16 @@ function RightPanel({ prefix, onPrefixChange, blocks, params, onRemove, onClear,
       </div>
 
       <div className="p-4 flex-1 flex flex-col gap-2">
-        {!hasAny && (
-          <div className="flex items-center justify-center h-24 border-2 border-dashed border-gray-300 rounded-xl">
-            <div className="text-center">
-              <p className="text-gray-400 text-sm">아직 선택된 속성이 없습니다</p>
-              <p className="text-gray-300 text-xs mt-1">← 왼쪽에서 속성을 선택하세요</p>
-            </div>
-          </div>
-        )}
-
-        {blockCategories.map((cat) => {
-          const selected = blocks[cat.id] || []
-          if (!hasAny && selected.length === 0) return null
-          return (
-            <SelectedCategoryBlock
-              key={cat.id}
-              category={cat}
-              selected={selected}
-              onRemove={onRemove}
-              onClear={onClear}
-            />
-          )
-        })}
+        {blockCategories.map((cat) => (
+          <SelectedCategoryBlock
+            key={cat.id}
+            category={cat}
+            selected={blocks[cat.id] || []}
+            onRemove={onRemove}
+            onClear={onClear}
+            onAddCustom={onAddCustom}
+          />
+        ))}
 
         <div className="mt-2">
           <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">
@@ -225,7 +254,14 @@ export default function App() {
   function handleSelect(categoryId, attr) {
     setBlocks((prev) => ({
       ...prev,
-      [categoryId]: [...(prev[categoryId] || []), attr],
+      [categoryId]: [...(prev[categoryId] || []), { value: attr, type: 'preset' }],
+    }))
+  }
+
+  function handleAddCustom(categoryId, value) {
+    setBlocks((prev) => ({
+      ...prev,
+      [categoryId]: [...(prev[categoryId] || []), { value, type: 'custom' }],
     }))
   }
 
@@ -269,16 +305,18 @@ export default function App() {
           <div className="text-center max-w-md">
             <h2 className="text-xl font-bold text-gray-700 mb-2">프롬프트 캔버스</h2>
             <p className="text-gray-400 text-sm leading-relaxed">
-              왼쪽 팔레트에서 속성을 선택하면<br />
-              여기에 조합된 블럭이 표시됩니다
+              왼쪽 팔레트에서 속성을 선택하거나<br />
+              우측 입력칸에 직접 타이핑하세요
             </p>
-            <div className="mt-6 grid grid-cols-2 gap-3 text-left">
-              {blockCategories.slice(0, 4).map((cat) => (
-                <div key={cat.id} className="bg-white rounded-lg p-3 border border-gray-200">
-                  <div className="text-xs font-semibold text-gray-700 mb-0.5">{cat.category}</div>
-                  <div className="text-xs text-gray-400">{cat.attributes.length}개 속성</div>
-                </div>
-              ))}
+            <div className="mt-6 flex gap-3 text-left">
+              <div className="flex-1 bg-white rounded-lg p-3 border border-indigo-200">
+                <div className="text-xs font-semibold text-indigo-700 mb-0.5">선택형</div>
+                <div className="text-xs text-gray-400">왼쪽 팔레트 클릭</div>
+              </div>
+              <div className="flex-1 bg-white rounded-lg p-3 border border-amber-200">
+                <div className="text-xs font-semibold text-amber-700 mb-0.5">입력형</div>
+                <div className="text-xs text-gray-400">우측 직접 입력</div>
+              </div>
             </div>
             <p className="mt-4 text-xs text-gray-400">
               총 {blockCategories.length}개 카테고리 · {blockCategories.reduce((acc, c) => acc + c.attributes.length, 0)}개 속성
@@ -294,6 +332,7 @@ export default function App() {
           onRemove={handleRemove}
           onClear={handleClear}
           onToggleParam={handleToggleParam}
+          onAddCustom={handleAddCustom}
         />
       </div>
     </div>
