@@ -1,24 +1,73 @@
+import { useState, useMemo } from 'react'
 import { blockCategories, parameterOptions } from './blockData.js'
 
-function PromptPreview() {
+function buildPrompt(blocks, params) {
+  const parts = blockCategories
+    .map((cat) => {
+      const block = blocks[cat.id]
+      return block && block.length > 0 ? block.join(', ') : null
+    })
+    .filter(Boolean)
+
+  const paramStr = params.length > 0 ? ' ' + params.join(' ') : ''
+  return parts.length > 0 ? parts.join(', ') + paramStr : ''
+}
+
+function PromptPreview({ prompt }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    if (!prompt) return
+    navigator.clipboard.writeText(prompt)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           생성된 프롬프트
         </span>
-        <button className="text-xs text-gray-400 border border-gray-300 rounded px-2 py-1 cursor-not-allowed opacity-50">
-          복사
+        <button
+          onClick={handleCopy}
+          disabled={!prompt}
+          className={`text-xs border rounded px-2 py-1 transition-colors
+            ${prompt
+              ? 'border-gray-300 text-gray-600 hover:border-indigo-400 hover:text-indigo-600 cursor-pointer'
+              : 'border-gray-200 text-gray-300 cursor-not-allowed'}`}
+        >
+          {copied ? '복사됨!' : '복사'}
         </button>
       </div>
-      <p className="text-gray-400 italic text-sm">
-        왼쪽에서 속성을 선택하면 프롬프트가 여기에 표시됩니다
-      </p>
+      {prompt ? (
+        <p className="text-gray-800 text-sm leading-relaxed font-mono break-all">{prompt}</p>
+      ) : (
+        <p className="text-gray-400 italic text-sm">
+          왼쪽에서 속성을 선택하면 프롬프트가 여기에 표시됩니다
+        </p>
+      )}
     </div>
   )
 }
 
-function CategoryBlock({ category }) {
+function Chip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full
+                     bg-indigo-50 text-indigo-700 border border-indigo-200">
+      {label}
+      <button
+        onClick={onRemove}
+        className="ml-0.5 text-indigo-400 hover:text-indigo-700 leading-none font-bold"
+        aria-label={`${label} 삭제`}
+      >
+        ×
+      </button>
+    </span>
+  )
+}
+
+function CategoryBlock({ category, onSelect }) {
   return (
     <div className="mb-5">
       <div className="mb-2">
@@ -29,10 +78,10 @@ function CategoryBlock({ category }) {
         {category.attributes.map((attr) => (
           <button
             key={attr}
+            onClick={() => onSelect(category.id, attr)}
             className="text-xs px-2.5 py-1 rounded-full border border-gray-300 text-gray-600
                        bg-white hover:border-indigo-400 hover:text-indigo-600
-                       hover:bg-indigo-50 transition-colors cursor-not-allowed"
-            title="2단계에서 클릭 기능이 추가됩니다"
+                       hover:bg-indigo-50 transition-colors cursor-pointer"
           >
             {attr}
           </button>
@@ -42,7 +91,7 @@ function CategoryBlock({ category }) {
   )
 }
 
-function LeftPanel() {
+function LeftPanel({ onSelect }) {
   return (
     <aside className="w-80 min-w-72 bg-gray-50 border-r border-gray-200 overflow-y-auto flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -51,82 +100,152 @@ function LeftPanel() {
       </div>
       <div className="p-4 flex-1">
         {blockCategories.map((cat) => (
-          <CategoryBlock key={cat.id} category={cat} />
+          <CategoryBlock key={cat.id} category={cat} onSelect={onSelect} />
         ))}
       </div>
     </aside>
   )
 }
 
-function RightPanel() {
+function SelectedCategoryBlock({ category, selected, onRemove, onClear }) {
+  return (
+    <div className="bg-white rounded-lg p-3 border border-gray-200">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-gray-700">{category.category}</span>
+        {selected.length > 0 && (
+          <button
+            onClick={() => onClear(category.id)}
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            전체 비우기
+          </button>
+        )}
+      </div>
+      {selected.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {selected.map((attr, idx) => (
+            <Chip
+              key={`${attr}-${idx}`}
+              label={attr}
+              onRemove={() => onRemove(category.id, idx)}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-300 italic">선택된 속성 없음</p>
+      )}
+    </div>
+  )
+}
+
+function RightPanel({ blocks, params, onRemove, onClear, onToggleParam }) {
+  const hasAny = blockCategories.some((c) => (blocks[c.id] || []).length > 0)
+
   return (
     <aside className="w-72 min-w-60 bg-gray-50 border-l border-gray-200 overflow-y-auto flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-sm font-bold text-gray-800">선택된 조합</h2>
         <p className="text-xs text-gray-400 mt-0.5">선택한 속성이 여기에 쌓입니다</p>
       </div>
-      <div className="p-4 flex-1 flex flex-col gap-2">
-        <div className="flex items-center justify-center h-32 border-2 border-dashed border-gray-300 rounded-xl">
-          <div className="text-center">
-            <p className="text-gray-400 text-sm">아직 선택된 속성이 없습니다</p>
-            <p className="text-gray-300 text-xs mt-1">← 왼쪽에서 속성을 선택하세요</p>
-          </div>
-        </div>
 
-        <div className="mt-4">
+      <div className="p-4 flex-1 flex flex-col gap-2">
+        {!hasAny && (
+          <div className="flex items-center justify-center h-24 border-2 border-dashed border-gray-300 rounded-xl">
+            <div className="text-center">
+              <p className="text-gray-400 text-sm">아직 선택된 속성이 없습니다</p>
+              <p className="text-gray-300 text-xs mt-1">← 왼쪽에서 속성을 선택하세요</p>
+            </div>
+          </div>
+        )}
+
+        {blockCategories.map((cat) => {
+          const selected = blocks[cat.id] || []
+          if (!hasAny && selected.length === 0) return null
+          return (
+            <SelectedCategoryBlock
+              key={cat.id}
+              category={cat}
+              selected={selected}
+              onRemove={onRemove}
+              onClear={onClear}
+            />
+          )
+        })}
+
+        <div className="mt-2">
           <h3 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">
             파라미터
           </h3>
           <div className="flex flex-wrap gap-1.5">
-            {parameterOptions.map((param) => (
-              <button
-                key={param.id}
-                className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-400
-                           bg-white font-mono cursor-not-allowed opacity-60"
-                title="2단계에서 활성화됩니다"
-              >
-                {param.label}
-              </button>
-            ))}
+            {parameterOptions.map((param) => {
+              const active = params.includes(param.label)
+              return (
+                <button
+                  key={param.id}
+                  onClick={() => onToggleParam(param.label)}
+                  className={`text-xs px-2 py-1 rounded border font-mono transition-colors
+                    ${active
+                      ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                      : 'border-gray-300 bg-white text-gray-500 hover:border-indigo-300 hover:text-indigo-500'}`}
+                >
+                  {param.label}
+                </button>
+              )
+            })}
           </div>
         </div>
-      </div>
-
-      <div className="p-4 border-t border-gray-200">
-        <button className="w-full py-2 px-4 bg-indigo-500 text-white text-sm font-semibold
-                           rounded-lg opacity-40 cursor-not-allowed">
-          프롬프트 생성
-        </button>
       </div>
     </aside>
   )
 }
 
 export default function App() {
+  const [blocks, setBlocks] = useState({})
+  const [params, setParams] = useState([])
+
+  function handleSelect(categoryId, attr) {
+    setBlocks((prev) => ({
+      ...prev,
+      [categoryId]: [...(prev[categoryId] || []), attr],
+    }))
+  }
+
+  function handleRemove(categoryId, index) {
+    setBlocks((prev) => ({
+      ...prev,
+      [categoryId]: prev[categoryId].filter((_, i) => i !== index),
+    }))
+  }
+
+  function handleClear(categoryId) {
+    setBlocks((prev) => ({ ...prev, [categoryId]: [] }))
+  }
+
+  function handleToggleParam(label) {
+    setParams((prev) =>
+      prev.includes(label) ? prev.filter((p) => p !== label) : [...prev, label]
+    )
+  }
+
+  const prompt = useMemo(() => buildPrompt(blocks, params), [blocks, params])
+
   return (
     <div className="h-screen flex flex-col bg-gray-100 text-gray-900 overflow-hidden">
-      {/* 헤더 */}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 shrink-0">
         <div className="w-8 h-8 bg-indigo-500 rounded-lg" />
         <div>
           <h1 className="text-base font-bold text-gray-900">Midjourney 프롬프트 생성기</h1>
           <p className="text-xs text-gray-400">블럭을 조합해 완벽한 프롬프트를 만드세요</p>
         </div>
-        <div className="ml-auto text-xs text-gray-400 border border-gray-200 rounded px-2 py-1">
-          1단계: 화면 골격
-        </div>
       </header>
 
-      {/* 프롬프트 미리보기 */}
       <div className="px-6 py-3 bg-gray-100 border-b border-gray-200 shrink-0">
-        <PromptPreview />
+        <PromptPreview prompt={prompt} />
       </div>
 
-      {/* 메인 3분할 영역 */}
       <div className="flex flex-1 overflow-hidden">
-        <LeftPanel />
+        <LeftPanel onSelect={handleSelect} />
 
-        {/* 중앙 캔버스 영역 */}
         <main className="flex-1 bg-gray-100 overflow-y-auto flex flex-col items-center justify-center p-8">
           <div className="text-center max-w-md">
             <h2 className="text-xl font-bold text-gray-700 mb-2">프롬프트 캔버스</h2>
@@ -148,7 +267,13 @@ export default function App() {
           </div>
         </main>
 
-        <RightPanel />
+        <RightPanel
+          blocks={blocks}
+          params={params}
+          onRemove={handleRemove}
+          onClear={handleClear}
+          onToggleParam={handleToggleParam}
+        />
       </div>
     </div>
   )
