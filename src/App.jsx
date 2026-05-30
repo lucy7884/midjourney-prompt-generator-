@@ -171,20 +171,9 @@ function LeftPanel({ onSelect }) {
   )
 }
 
-// ─── 우측 블럭 카드 (칩 DnD 포함) ───────────────────────────────────────────
-function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCustom, onReorderChips, dragHandleListeners, isDragging }) {
+// ─── 우측 블럭 카드 (SortableContext만, DndContext 없음) ─────────────────────
+function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCustom, dragHandleListeners, isDragging }) {
   const [input, setInput] = useState('')
-
-  const chipSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
-
-  function handleChipDragEnd({ active, over }) {
-    if (!over || active.id === over.id) return
-    const oldIdx = selected.findIndex((item) => item.id === active.id)
-    const newIdx = selected.findIndex((item) => item.id === over.id)
-    onReorderChips(category.id, arrayMove(selected, oldIdx, newIdx))
-  }
 
   function handleAdd() {
     const trimmed = input.trim()
@@ -205,14 +194,14 @@ function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCus
         <div className="flex items-center gap-1.5">
           <button
             {...dragHandleListeners}
-            className="flex items-center gap-0.5 px-1.5 py-1 rounded
+            className="flex items-center px-1.5 py-1 rounded
                        bg-gray-100 hover:bg-indigo-100 text-gray-400 hover:text-indigo-500
                        cursor-grab active:cursor-grabbing touch-none select-none
                        border border-gray-200 hover:border-indigo-300 transition-colors"
             aria-label="블럭 순서 변경"
             title="드래그해서 순서 변경"
           >
-            <span className="text-xs leading-none tracking-tighter font-bold">⠿</span>
+            <span className="text-xs leading-none font-bold">⠿</span>
           </button>
           <span className="text-xs font-semibold text-gray-700">{category.category}</span>
         </div>
@@ -226,33 +215,26 @@ function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCus
         )}
       </div>
 
-      {/* 칩 영역 — 내부 DnD */}
-      <DndContext
-        sensors={chipSensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleChipDragEnd}
+      {/* 칩 영역 — DndContext 없이 SortableContext만 */}
+      <SortableContext
+        items={selected.map((item) => item.id)}
+        strategy={rectSortingStrategy}
       >
-        <SortableContext
-          items={selected.map((item) => item.id)}
-          strategy={rectSortingStrategy}
-        >
-          <div className="flex flex-wrap gap-1.5 min-h-5">
-            {selected.length === 0 && (
-              <p className="text-xs text-gray-300 italic">선택된 속성 없음</p>
-            )}
-            {selected.map((item) => (
-              <SortableChip
-                key={item.id}
-                id={item.id}
-                item={item}
-                onRemove={() => onRemove(category.id, item.id)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+        <div className="flex flex-wrap gap-1.5 min-h-5">
+          {selected.length === 0 && (
+            <p className="text-xs text-gray-300 italic">선택된 속성 없음</p>
+          )}
+          {selected.map((item) => (
+            <SortableChip
+              key={item.id}
+              id={item.id}
+              item={item}
+              onRemove={() => onRemove(category.id, item.id)}
+            />
+          ))}
+        </div>
+      </SortableContext>
 
-      {/* 직접 입력 */}
       <div className="flex gap-1.5 mt-2">
         <input
           type="text"
@@ -278,19 +260,41 @@ function SelectedCategoryBlock({ category, selected, onRemove, onClear, onAddCus
   )
 }
 
-// ─── 우측 패널 (블럭 DnD 포함) ───────────────────────────────────────────────
+// ─── 우측 패널 — DndContext 하나로 블럭+칩 모두 처리 ─────────────────────────
 function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
   onRemove, onClear, onToggleParam, onAddCustom, onReorderBlocks, onReorderChips }) {
 
-  const blockSensors = useSensors(
+  const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
 
-  function handleBlockDragEnd({ active, over }) {
+  function handleDragEnd({ active, over }) {
     if (!over || active.id === over.id) return
-    const oldIdx = blockOrder.indexOf(active.id)
-    const newIdx = blockOrder.indexOf(over.id)
-    onReorderBlocks(arrayMove(blockOrder, oldIdx, newIdx))
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    const isChip = activeId.startsWith('chip-')
+
+    if (isChip) {
+      // 칩 드래그: 같은 블럭 안에서만 재정렬
+      for (const catId of blockOrder) {
+        const chips = blocks[catId] || []
+        const oldIdx = chips.findIndex((c) => c.id === activeId)
+        const newIdx = chips.findIndex((c) => c.id === overId)
+        if (oldIdx !== -1 && newIdx !== -1) {
+          onReorderChips(catId, arrayMove(chips, oldIdx, newIdx))
+          return
+        }
+      }
+    } else {
+      // 블럭 드래그: 블럭 순서 변경 (over가 칩이면 무시)
+      if (overId.startsWith('chip-')) return
+      const oldIdx = blockOrder.indexOf(activeId)
+      const newIdx = blockOrder.indexOf(overId)
+      if (oldIdx !== -1 && newIdx !== -1) {
+        onReorderBlocks(arrayMove(blockOrder, oldIdx, newIdx))
+      }
+    }
   }
 
   return (
@@ -317,10 +321,11 @@ function RightPanel({ prefix, onPrefixChange, blockOrder, blocks, params,
       </div>
 
       <div className="p-4 flex-1 flex flex-col gap-2">
+        {/* DndContext 하나 — 블럭과 칩 모두 처리 */}
         <DndContext
-          sensors={blockSensors}
+          sensors={sensors}
           collisionDetection={closestCenter}
-          onDragEnd={handleBlockDragEnd}
+          onDragEnd={handleDragEnd}
         >
           <SortableContext items={blockOrder} strategy={verticalListSortingStrategy}>
             {blockOrder.map((catId) => {
@@ -458,7 +463,7 @@ export default function App() {
               </div>
               <div className="flex-1 bg-white rounded-lg p-3 border border-gray-200">
                 <div className="text-xs font-semibold text-gray-700 mb-0.5">순서 변경</div>
-                <div className="text-xs text-gray-400">≡ 드래그</div>
+                <div className="text-xs text-gray-400">⠿ 드래그</div>
               </div>
             </div>
             <p className="mt-4 text-xs text-gray-400">
